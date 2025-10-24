@@ -1,64 +1,8 @@
+// components/MobileDock.jsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-
-/* ---------------------------------------------
-   (Optional) Side chat wrapper — desktop only
-   Use this where you previously rendered the
-   “side chat” so it disappears on mobile.
-   Example:
-     <SideChat>
-       <YourExistingSideChatUI />
-     </SideChat>
------------------------------------------------- */
-export function SideChat({ children, className = "" }) {
-  return (
-    <aside
-      className={`hidden md:flex md:flex-col md:w-80 md:shrink-0 ${className}`}
-      aria-label="Sommelier side chat (desktop only)"
-    >
-      {children}
-    </aside>
-  );
-}
-
-/**
- * Minimal placeholder for Camera/Upload so this file is self-contained.
- */
-function CameraOrUpload({ onCapture, title }) {
-  const [file, setFile] = useState(null);
-
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-
-      const reader = new FileReader();
-      reader.onload = (readEvent) => onCapture?.(readEvent.target.result);
-      reader.readAsDataURL(selectedFile);
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center p-4 border border-dashed rounded-lg border-base-300 bg-base-100">
-      <h4 className="text-lg font-semibold mb-2">{title || "Camera or Upload"}</h4>
-      <p className="text-sm text-base-content/70 mb-4">
-        This is a placeholder. A real component would show a camera view or file
-        upload button.
-      </p>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="file-input file-input-bordered file-input-primary w-full max-w-xs"
-      />
-      {file && <p className="text-sm mt-2">Selected: {file.name}</p>}
-      <p className="text-xs text-base-content/50 mt-4">
-        (Selecting a file will simulate a capture)
-      </p>
-    </div>
-  );
-}
+import CameraOrUpload from "./CameraOrUpload";
 
 /**
  * Props:
@@ -75,12 +19,22 @@ export default function MobileDock({
 }) {
   const [openSnap, setOpenSnap] = useState(false);
   const [openChat, setOpenChat] = useState(false);
+  const [unread, setUnread] = useState(false); // show dot when results arrive and chat closed
   const snapRef = useRef(null);
 
   useEffect(() => {
     if (openSnap) snapRef.current?.showModal?.();
     else snapRef.current?.close?.();
   }, [openSnap]);
+
+  // Mark unread when navbar broadcasts a new result and the chat modal isn't open
+  useEffect(() => {
+    const onResult = () => {
+      if (!openChat) setUnread(true);
+    };
+    window.addEventListener("sommelier:search-result", onResult);
+    return () => window.removeEventListener("sommelier:search-result", onResult);
+  }, [openChat]);
 
   function handleCapture(dataUrl) {
     onCapture?.(dataUrl);
@@ -90,7 +44,6 @@ export default function MobileDock({
   // Consistent mobile sizing
   const btnBase =
     "flex flex-col items-center justify-center gap-0.5 px-3 py-2.5 min-w-16";
-  const icon = "w-5 h-5";
   const label = "dock-label text-xs";
 
   return (
@@ -104,7 +57,7 @@ export default function MobileDock({
             onClick={() => onNavigate?.("home")}
           >
             <svg
-              className={icon}
+              className="w-5 h-5"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               aria-hidden="true"
@@ -168,32 +121,28 @@ export default function MobileDock({
             <span className="sr-only">Snap</span>
           </button>
 
-          {/* Chat (opens modal) */}
+          {/* Chat (opens modal) — avatar icon + unread dot */}
           <button
             className={`${btnBase} ${active === "chat" ? "dock-active" : ""}`}
             onClick={() => {
               onNavigate?.("chat");
               setOpenChat(true);
+              setUnread(false);
             }}
             aria-label="Open chat"
             title="Sommelier Chat"
           >
-            <svg
-              className={icon}
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <g
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <path d="M21 12c0 3.866-3.806 7-8.5 7a9.9 9.9 0 0 1-2.9-.42L4 20l1.59-3.18A7.6 7.6 0 0 1 3 12c0-3.866 3.806-7 8.5-7S21 8.134 21 12Z" />
-                <path d="M8 11h8M8 14h5" />
-              </g>
-            </svg>
+            <span className="relative inline-block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/sommelier-head.png"
+                alt="Sommelier"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full ring-1 ring-white/10 object-cover"
+              />
+              {unread && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent ring-2 ring-base-100" />
+              )}
+            </span>
             <span className={label}>Chat</span>
           </button>
 
@@ -205,7 +154,7 @@ export default function MobileDock({
             onClick={() => onNavigate?.("settings")}
           >
             <svg
-              className={icon}
+              className="w-5 h-5"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               aria-hidden="true"
@@ -253,7 +202,12 @@ export default function MobileDock({
             </form>
           </div>
           <div className="p-3 max-h-[70vh] overflow-auto">
-            <CameraOrUpload onCapture={handleCapture} title="Camera or Upload" />
+            {/* Auto-open camera on mobile when modal appears */}
+            <CameraOrUpload
+              onCapture={handleCapture}
+              title="Camera or Upload"
+              autoStartOnMount
+            />
           </div>
           <div className="modal-action p-3 pt-0">
             <form method="dialog">
@@ -308,6 +262,7 @@ function DockChat({ open, onClose, context }) {
     setInput("");
     setSending(true);
     try {
+      // Placeholder async; replace with your real API if needed
       await new Promise((r) => setTimeout(r, 1000));
       const data = {
         answer: `I've received your query about "${question}". Here is a simulated response.`,

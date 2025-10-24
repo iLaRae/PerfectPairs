@@ -5,17 +5,23 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Props:
- * - onCapture: (dataUrl: string) => void      // receives a base64 data URL
+ * - onCapture: (dataUrl: string) => void
  * - className?: string
  * - title?: string
+ * - autoStartOnMount?: boolean   // auto-open camera on mount (great for mobile)
  */
-export default function CameraOrUpload({ onCapture, className = "", title = "Camera or Upload" }) {
+export default function CameraOrUpload({
+  onCapture,
+  className = "",
+  title = "Camera or Upload",
+  autoStartOnMount = false,
+}) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
 
-  const [support, setSupport] = useState({
+  const [support] = useState({
     mediaDevices: typeof navigator !== "undefined" && !!navigator.mediaDevices,
     fileInput: true,
   });
@@ -31,6 +37,20 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-start camera on mount (especially useful for mobile)
+  useEffect(() => {
+    const isMobileUA =
+      typeof navigator !== "undefined" &&
+      /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(
+        navigator.userAgent || ""
+      );
+    if (autoStartOnMount && support.mediaDevices && isMobileUA && !usingCamera) {
+      // Triggered by a recent user tap (opening the modal), so it's allowed
+      startCamera();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStartOnMount, support.mediaDevices]);
+
   async function startCamera() {
     if (!support.mediaDevices) {
       setError("Camera not supported. Try uploading an image instead.");
@@ -39,7 +59,6 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
     try {
       setError("");
       setBusy(true);
-      // Try rear camera first
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: false,
@@ -50,7 +69,7 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
         await videoRef.current.play();
       }
       setUsingCamera(true);
-    } catch (e) {
+    } catch {
       setError("Could not access camera. You can still upload a photo.");
     } finally {
       setBusy(false);
@@ -86,9 +105,10 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
       ctx.drawImage(video, 0, 0, w, h);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
       onCapture?.(dataUrl);
+
       // Optional: stop camera after capture
       stopCamera();
-    } catch (e) {
+    } catch {
       setError("Failed to capture image. Try again or upload instead.");
     }
   }
@@ -102,25 +122,39 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
   }
 
   return (
-    <div className={["card bg-base-100 shadow-2xl rounded-3xl ring-1 ring-white/10", className].join(" ")}>
-      <div className="card-body gap-5">
-        <div className="flex items-center justify-between">
-          <h2 className="card-title">{title}</h2>
+    <div
+      className={[
+        "card bg-base-100 shadow-2xl rounded-3xl ring-1 ring-white/10",
+        "max-w-full", // never overflow
+        className,
+      ].join(" ")}
+    >
+      <div className="card-body gap-4 sm:gap-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="card-title text-base sm:text-lg">{title}</h2>
           <div className="badge badge-primary badge-outline">Mobile Ready</div>
         </div>
 
-        {/* Camera / Upload toolbar */}
-        <div className="join w-full">
+        {/* Camera / Upload toolbar (stacks on very small screens) */}
+        <div className="join w-full flex-wrap sm:flex-nowrap gap-2 sm:gap-0">
           <button
             onClick={usingCamera ? stopCamera : startCamera}
-            className={`btn join-item ${usingCamera ? "btn-warning" : "btn-primary"}`}
+            className={`btn join-item btn-sm sm:btn-md ${
+              usingCamera ? "btn-warning" : "btn-primary"
+            }`}
             disabled={busy}
           >
-            {busy ? <span className="loading loading-spinner" /> : usingCamera ? "Stop Camera" : "Use Camera"}
+            {busy ? (
+              <span className="loading loading-spinner" />
+            ) : usingCamera ? (
+              "Stop Camera"
+            ) : (
+              "Use Camera"
+            )}
           </button>
           <button
             onClick={() => fileRef.current?.click()}
-            className="btn btn-ghost join-item"
+            className="btn join-item btn-sm sm:btn-md btn-ghost"
             disabled={busy}
           >
             Upload Photo
@@ -143,22 +177,28 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
                 ref={videoRef}
                 playsInline
                 muted
-                className="rounded-2xl w-full max-h-[420px] object-contain bg-base-100"
+                className="rounded-2xl w-full h-auto object-contain bg-base-100"
+                // Use modern viewport units so it scales well on mobile; clamp height
+                style={{ maxHeight: "min(60svh, 480px)" }}
               />
               <canvas ref={canvasRef} className="hidden" />
             </div>
-            <div className="p-3 flex items-center justify-between">
-              <div className="text-sm opacity-80">
-                Center the list and tap snap. Uses your rear camera when available.
+            <div className="p-2 sm:p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 justify-between">
+              <div className="text-xs sm:text-sm opacity-80">
+                Center the list and tap snap. Uses your rear camera when
+                available.
               </div>
-              <button onClick={snapPhoto} className="btn btn-secondary btn-wide rounded-2xl">
+              <button
+                onClick={snapPhoto}
+                className="btn btn-secondary btn-sm sm:btn-md rounded-2xl"
+              >
                 Snap Photo
               </button>
             </div>
           </div>
         )}
 
-        {/* Upload dropzone-style tile (shown when camera is off) */}
+        {/* Upload tile (when camera is off) */}
         {!usingCamera && (
           <label
             onClick={() => fileRef.current?.click()}
@@ -167,9 +207,12 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
               "shadow-[0_8px_24px_rgba(0,0,0,0.35)]",
               "ring-1 ring-white/10",
               "transition-transform hover:scale-[1.01] active:scale-[0.99]",
-              "min-h-40 grid place-items-center",
+              "min-h-40 sm:min-h-48 grid place-items-center",
             ].join(" ")}
-            style={{ background: "linear-gradient(180deg, #0f172a 0%, #0b1022 100%)" }}
+            style={{
+              background:
+                "linear-gradient(180deg, #0f172a 0%, #0b1022 100%)",
+            }}
           >
             {/* inner bevel */}
             <div
@@ -189,14 +232,16 @@ export default function CameraOrUpload({ onCapture, className = "", title = "Cam
                   "radial-gradient(120% 80% at 10% 0%, black 0%, black 55%, transparent 70%)",
               }}
             />
-            <div className="relative z-10 flex flex-col items-center gap-2 px-4 py-10 text-center">
-              <div className="grid size-16 place-items-center rounded-2xl bg-base-100/10 ring-1 ring-white/10 backdrop-blur-sm">
-                <span className="text-3xl">📷</span>
+            <div className="relative z-10 flex flex-col items-center gap-2 px-4 py-8 sm:py-10 text-center">
+              <div className="grid size-14 sm:size-16 place-items-center rounded-2xl bg-base-100/10 ring-1 ring-white/10 backdrop-blur-sm">
+                <span className="text-2xl sm:text-3xl">📷</span>
               </div>
-              <div className="text-white/95 font-medium">
+              <div className="text-white/95 font-medium text-sm sm:text-base">
                 Tap to upload a clear photo of the wine list
               </div>
-              <div className="text-white/70 text-sm">Good lighting • No glare • Crop to list if possible</div>
+              <div className="text-white/70 text-xs sm:text-sm">
+                Good lighting • No glare • Crop to list if possible
+              </div>
             </div>
           </label>
         )}
