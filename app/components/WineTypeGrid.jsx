@@ -54,7 +54,7 @@ export default function WineTypeGrid({
 
   return (
     <div className="w-full">
-      <h2 className="text-xl font-semibold mb-4">Choose Wine Type</h2>
+      <h2 className="text-xl font-semibold mb-4 text-black"></h2>
 
       <div className={`grid ${gridCols} ${SZ.gap}`}>
         {items.map((it) => {
@@ -127,7 +127,7 @@ export default function WineTypeGrid({
               </button>
 
               {/* label */}
-              <div className={`mt-2 text-center ${SZ.label} text-white/95`}>
+              <div className={`mt-2 text-center ${SZ.label} text-black/95`}>
                 {it.label}
               </div>
             </div>
@@ -135,7 +135,7 @@ export default function WineTypeGrid({
         })}
       </div>
 
-      <div className="mt-6 text-center text-sm text-base-content/60">
+      <div className="mt-6 text-center text-sm text-gray-700">
         Tip: Tap to {multi ? "select multiple" : "select one"} wine type
         {multi ? "s" : ""}.
       </div>
@@ -186,7 +186,7 @@ const DEFAULT_WINES = [
   { key: "sangiovese", label: "Sangiovese", emoji: "🍷" },
   { key: "tempranillo", label: "Tempranillo", emoji: "🍷" },
   { key: "zinfandel", label: "Zinfandel", emoji: "🍷" },
-
+ 
   // Whites
   { key: "chardonnay", label: "Chardonnay", emoji: "🥂" },
   { key: "sauvignon-blanc", label: "Sauvignon Blanc", emoji: "🥂" },
@@ -199,9 +199,8 @@ const DEFAULT_WINES = [
   { key: "champagne", label: "Champagne", emoji: "🍾" },
   { key: "prosecco", label: "Prosecco", emoji: "🍾" },
   { key: "cava", label: "Cava", emoji: "🍾" },
-
+ 
   // Fortified / Dessert
   { key: "port", label: "Port", emoji: "🛡️" },
   { key: "sherry", label: "Sherry", emoji: "🛡️" },
 ];
-

@@ -19,15 +19,16 @@ export default function MobileDock({
 }) {
   const [openSnap, setOpenSnap] = useState(false);
   const [openChat, setOpenChat] = useState(false);
-  const [unread, setUnread] = useState(false); // show dot when results arrive and chat closed
+  const [unread, setUnread] = useState(false); // dot when results arrive and chat closed
   const snapRef = useRef(null);
 
+  // Control the camera modal
   useEffect(() => {
     if (openSnap) snapRef.current?.showModal?.();
     else snapRef.current?.close?.();
   }, [openSnap]);
 
-  // Mark unread when navbar broadcasts a new result and the chat modal isn't open
+  // Mark unread when app broadcasts a new result and the chat modal isn't open
   useEffect(() => {
     const onResult = () => {
       if (!openChat) setUnread(true);
@@ -48,7 +49,7 @@ export default function MobileDock({
 
   return (
     <>
-      {/* Bottom Dock — MOBILE ONLY */}
+      {/* Bottom Dock — MOBILE ONLY (no side chat anywhere) */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-50 pb-[calc(env(safe-area-inset-bottom)+0.65rem)]">
         <div className="dock dock-md mx-auto w-full max-w-3xl bg-base-100/95 backdrop-blur border-t border-base-200 shadow-lg rounded-t-2xl px-2">
           {/* Home */}
@@ -121,7 +122,7 @@ export default function MobileDock({
             <span className="sr-only">Snap</span>
           </button>
 
-          {/* Chat (opens modal) — avatar icon + unread dot */}
+          {/* Chat (opens modal) — only entry point to chat */}
           <button
             className={`${btnBase} ${active === "chat" ? "dock-active" : ""}`}
             onClick={() => {
@@ -201,14 +202,17 @@ export default function MobileDock({
               </button>
             </form>
           </div>
+
           <div className="p-3 max-h-[70vh] overflow-auto">
-            {/* Auto-open camera on mobile when modal appears */}
+            {/* Auto-open camera on mobile with immersive overlay */}
             <CameraOrUpload
               onCapture={handleCapture}
               title="Camera or Upload"
               autoStartOnMount
+              forceFullscreenOnMobile
             />
           </div>
+
           <div className="modal-action p-3 pt-0">
             <form method="dialog">
               <button className="btn" onClick={() => setOpenSnap(false)}>
@@ -217,12 +221,13 @@ export default function MobileDock({
             </form>
           </div>
         </div>
+
         <form method="dialog" className="modal-backdrop">
           <button onClick={() => setOpenSnap(false)}>close</button>
         </form>
       </dialog>
 
-      {/* CHAT Modal (only opened from the dock) */}
+      {/* CHAT Modal — the ONLY chat UI */}
       <DockChat
         open={openChat}
         onClose={() => setOpenChat(false)}
@@ -232,7 +237,7 @@ export default function MobileDock({
   );
 }
 
-/* ---------- Dock Chat (no side avatar bubbles) ---------- */
+/* ---------- Dock Chat (no side avatar/bubbles anywhere else) ---------- */
 function DockChat({ open, onClose, context }) {
   const dlgRef = useRef(null);
   const [messages, setMessages] = useState([
@@ -262,12 +267,15 @@ function DockChat({ open, onClose, context }) {
     setInput("");
     setSending(true);
     try {
-      // Placeholder async; replace with your real API if needed
-      await new Promise((r) => setTimeout(r, 1000));
-      const data = {
-        answer: `I've received your query about "${question}". Here is a simulated response.`,
-      };
-      setMessages((m) => [...m, { role: "assistant", content: data.answer }]);
+      // TODO: replace with your real API call
+      await new Promise((r) => setTimeout(r, 800));
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: `I've received your query about "${question}". Here is a simulated response.`,
+        },
+      ]);
     } catch {
       setMessages((m) => [
         ...m,

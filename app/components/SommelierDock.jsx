@@ -6,31 +6,53 @@ import SommelierChat from "./SommelierChat";
 /**
  * Props:
  * - context?: { meal?: string; favorites?: string[]; wines?: any[] }
- * - avatarSrc?: string        // default "/sommelier-head.png"
+ * - avatarSrc?: string        // default "/pairings-logo.png"
  * - initialQuestion?: string  // optional question to pre-ask on open
  */
 export default function SommelierDock({
   context = { meal: "", favorites: [], wines: [] },
-  avatarSrc = "/sommelier-head.png",
+  avatarSrc = "/pairings-logo.png", // Default avatar source
   initialQuestion = "",
 }) {
   const dialogRef = useRef(null);
   const [open, setOpen] = useState(false);
 
-  // NEW: preview last navbar search result
+  // Preview of last navbar search result
   const [lastResult, setLastResult] = useState(null); // { query, answer }
   const [previewVisible, setPreviewVisible] = useState(true);
 
+  // Manage dialog open/close + prevent background scroll
   useEffect(() => {
-    if (open) dialogRef.current?.showModal?.();
-    else dialogRef.current?.close?.();
-  }, [open]);
+    const d = dialogRef.current;
+    if (!d) return;
+    if (open) {
+      d.showModal?.();
+      document.documentElement.style.overflow = "hidden";
+      // seed an initial question if provided
+      if (initialQuestion.trim()) {
+        setTimeout(() => {
+          const ev = new CustomEvent("sommelier:seed-question", {
+            detail: initialQuestion.trim(),
+          });
+          window.dispatchEvent(ev);
+        }, 0);
+      }
+    } else {
+      try {
+        d.close?.();
+      } catch {}
+      document.documentElement.style.overflow = "";
+    }
+    return () => {
+      document.documentElement.style.overflow = "";
+    };
+  }, [open, initialQuestion]);
 
   function openChat() {
     setOpen(true);
   }
 
-  // Listen for navbar search results
+  // Listen for navbar search results and show compact preview
   useEffect(() => {
     function onResult(e) {
       const payload = e?.detail || {};
@@ -45,7 +67,6 @@ export default function SommelierDock({
   // Push the preview result into chat and open it
   function openInChatFromPreview() {
     if (lastResult?.query) {
-      // seed both question and answer into the chat via events SommelierChat listens to
       window.dispatchEvent(
         new CustomEvent("sommelier:search-result", { detail: lastResult })
       );
@@ -56,31 +77,45 @@ export default function SommelierDock({
 
   return (
     <>
-      {/* Top strip with avatar + quick prompt */}
+      {/* Top strip with avatar + quick prompt (safe-area aware) */}
       <div className="sticky top-0 z-50 bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60 border-b border-base-200">
-        <div className="mx-auto max-w-6xl px-3 py-2 flex flex-col gap-2">
+        <div
+          className="mx-auto w-full px-3 py-2 flex flex-col gap-2"
+          style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.25rem)" }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl overflow-hidden ring-1 ring-white/10 shadow">
+            <div className="w-9 h-9 rounded-xl overflow-hidden ring-1 ring-white/10 shadow shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={avatarSrc} alt="Sommelier avatar" className="w-full h-full object-cover" />
+              <img
+                src={avatarSrc} // Correctly uses avatarSrc here
+                alt="Sommelier avatar"
+                className="w-full h-full object-cover"
+              />
             </div>
-            <div className="text-sm opacity-80 hidden sm:block">
+
+            <div className="text-xs sm:text-sm opacity-80 hidden xs:block">
               Sommelier is available on every page. Ask pairing questions anytime.
             </div>
-            <div className="ml-auto join">
+
+            <div className="ml-auto join shrink-0">
               <input
                 type="text"
-                className="input input-bordered input-sm join-item w-44 md:w-72"
+                className="input input-bordered input-sm join-item w-40 xs:w-52 md:w-72"
                 placeholder="Ask the sommelier…"
+                inputMode="text"
+                autoCapitalize="sentences"
+                autoCorrect="on"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     const val = e.currentTarget.value.trim();
                     if (val) {
-                      // open the chat; we’ll seed the question via separate event
                       setOpen(true);
+                      // seed the question after dialog opens
                       setTimeout(() => {
-                        const ev = new CustomEvent("sommelier:seed-question", { detail: val });
+                        const ev = new CustomEvent("sommelier:seed-question", {
+                          detail: val,
+                        });
                         window.dispatchEvent(ev);
                       }, 0);
                       e.currentTarget.value = "";
@@ -88,27 +123,40 @@ export default function SommelierDock({
                   }
                 }}
               />
-              <button onClick={openChat} className="btn btn-primary btn-sm join-item">
+              <button
+                onClick={openChat}
+                className="btn btn-primary btn-sm join-item"
+              >
                 Open Chat
               </button>
             </div>
           </div>
 
-          {/* NEW: compact preview of last navbar search result */}
+          {/* Last result preview (responsive) */}
           {lastResult && previewVisible && (
             <div className="rounded-xl border border-base-200 bg-base-100/70 shadow-sm p-2 sm:p-3 flex items-start gap-3">
-              <div className="badge badge-neutral shrink-0 mt-0.5">Last result</div>
+              <div className="badge badge-neutral shrink-0 mt-0.5">
+                Last result
+              </div>
               <div className="min-w-0">
-                <div className="text-sm font-medium truncate">“{lastResult.query}”</div>
+                <div className="text-sm font-medium truncate">
+                  “{lastResult.query}”
+                </div>
                 <p className="text-sm opacity-80 line-clamp-2">
                   {lastResult.answer}
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-2 shrink-0">
-                <button className="btn btn-primary btn-xs" onClick={openInChatFromPreview}>
+                <button
+                  className="btn btn-primary btn-xs"
+                  onClick={openInChatFromPreview}
+                >
                   Open in Chat
                 </button>
-                <button className="btn btn-ghost btn-xs" onClick={() => setPreviewVisible(false)}>
+                <button
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => setPreviewVisible(false)}
+                >
                   Dismiss
                 </button>
               </div>
@@ -117,38 +165,74 @@ export default function SommelierDock({
         </div>
       </div>
 
-      {/* Modal chat panel */}
+      {/* Modal chat panel – full-screen on mobile, card on larger screens */}
       <dialog ref={dialogRef} className="modal">
-        <div className="modal-box max-w-3xl">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl overflow-hidden ring-1 ring-white/10">
-                <img src={avatarSrc} alt="Sommelier avatar" />
+        <div
+          className={[
+            "modal-box",
+            // Full-bleed on phones; constrained on >=sm
+            "w-[100vw] h-[100svh] max-w-none sm:max-w-3xl sm:h-auto",
+            "p-0 overflow-hidden flex flex-col",
+            "rounded-none sm:rounded-3xl ring-1 ring-white/10 shadow-2xl",
+          ].join(" ")}
+          style={{
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
+        >
+          {/* Header (mobile-friendly) */}
+          <div className="px-3 sm:px-4 py-3 flex items-center justify-between border-b border-base-200">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-xl overflow-hidden ring-1 ring-white/10 shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={avatarSrc} alt="Sommelier avatar" /> {/* Correctly uses avatarSrc here */}
               </div>
-              <h3 className="font-semibold">Sommelier Chat</h3>
+              <h3 className="font-semibold truncate">Sommelier Chat</h3>
             </div>
             <form method="dialog">
-              <button className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                title="Close"
+              >
                 ✕
               </button>
             </form>
           </div>
 
-          <SeededSommelierChat avatarSrc={avatarSrc} context={context} />
+          {/* Chat body fills remaining height on mobile */}
+          <div className="flex-1 min-h-0">
+            <SeededSommelierChat
+              avatarSrc={avatarSrc} // Correctly passes avatarSrc to SeededSommelierChat
+              context={context}
+              // Let inner component manage its own layout; remove outer shadows
+              className="shadow-none ring-0"
+            />
+          </div>
 
-          <div className="modal-action">
+          {/* Footer actions (desktop only) */}
+          <div className="hidden sm:flex items-center justify-end gap-2 px-4 py-3 border-t border-base-200">
             <form method="dialog">
-              <button className="btn" onClick={() => setOpen(false)}>Close</button>
+              <button className="btn" onClick={() => setOpen(false)}>
+                Close
+              </button>
             </form>
           </div>
         </div>
+
+        {/* Click outside to close */}
+        <form method="dialog" className="modal-backdrop">
+          <button aria-label="Close overlay" onClick={() => setOpen(false)}>
+            close
+          </button>
+        </form>
       </dialog>
     </>
   );
 }
 
 /* Helper: allow the top input to seed a first question into the chat */
-function SeededSommelierChat({ avatarSrc, context }) {
+function SeededSommelierChat({ avatarSrc, context, className = "" }) {
   const [seed, setSeed] = useState("");
 
   useEffect(() => {
@@ -157,12 +241,20 @@ function SeededSommelierChat({ avatarSrc, context }) {
     return () => window.removeEventListener("sommelier:seed-question", onSeed);
   }, []);
 
-  // We render SommelierChat; it handles the injected events itself.
+  // Forward the seeded question via the event that SommelierChat already listens to.
+  useEffect(() => {
+    if (!seed) return;
+    const ev = new CustomEvent("sommelier:search-result", {
+      detail: { query: seed, answer: "" },
+    });
+    window.dispatchEvent(ev);
+  }, [seed]);
+
   return (
     <SommelierChat
-      avatarSrc={avatarSrc}
+      avatarSrc={avatarSrc} // Correctly passes avatarSrc to SommelierChat
       context={context}
-      className="shadow-none ring-0"
+      className={["shadow-none ring-0 h-full"].join(" ")}
     />
   );
 }
